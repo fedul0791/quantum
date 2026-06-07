@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: qf-postgres
+    environment:
+      POSTGRES_DB: quantum_flow
+      POSTGRES_USER: qf_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: qf-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  market-collector:
+    build:
+      context: ./services/market-collector
+      dockerfile: Dockerfile
+    container_name: qf-market-collector
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  analytics-engine:
+    build:
+      context: ./services/analytics-engine
+      dockerfile: Dockerfile
+    container_name: qf-analytics-engine
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qf-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql+asyncpg://qf_user:changeme@postgres:5432/quantum_flow
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-change-in-production-min-32-chars-long
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - market-collector
+      - analytics-engine
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+
+  integration-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qf-integration-worker
+    command: python -m app.workers.integration
+    environment:
+      DATABASE_URL: postgresql+asyncpg://qf_user:changeme@postgres:5432/quantum_flow
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-change-in-production-min-32-chars-long
+      DEBUG: "True"
+    depends_on:
+      - postgres
+      - redis
+      - market-collector
+      - analytics-engine
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: qf-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,4 @@
+websockets==14.1
+orjson==3.10.13
+redis==5.0.8
+python-dotenv==1.0.1
