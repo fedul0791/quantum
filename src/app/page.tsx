@@ -4,8 +4,7 @@ import { binanceWS } from '@/lib/binanceWebSocket'
 import { useMarketStore } from '@/store/marketStore'
 import ProfessionalOrderBook from '@/components/ProfessionalOrderBook'
 import HFTAnalytics from '@/components/HFTAnalytics'
-import AdvancedTradingChart from "@/components/AdvancedTradingChart"
-import { AnimatedCard, SlideIn, StaggerContainer } from '@/lib/animations'
+import { AnimatedCard, SlideIn } from '@/lib/animations'
 
 function Sparkline({ data, color, width = 80, height = 30 }: { data: number[]; color: string; width?: number; height?: number }) {
   if (!data || data.length < 2) return <div style={{ width, height }} />
@@ -48,6 +47,7 @@ export default function Dashboard() {
   const prices = useMarketStore(state => state.prices)
   const isConnected = useMarketStore(state => state.isConnected)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     binanceWS.connect()
@@ -55,38 +55,45 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    const interval = setInterval(() => setTime(new Date().toLocaleTimeString('ru-RU')), 1000)
+    const interval = setInterval(() => setTime(new Date().toLocaleTimeString('en-US')), 1000)
     return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    fetch('/api/binance')
-      .then(r => r.json())
-      .then(data => {
+    const fetchBinanceData = async () => {
+      try {
+        const response = await fetch('/api/binance')
+        if (!response.ok) throw new Error(`API error: ${response.status}`)
+        const data = await response.json()
+        
         if (Array.isArray(data)) {
           const map: any = {}
           data.forEach((t: any) => {
-            map[t.symbol] = {
-              price: parseFloat(t.lastPrice),
-              change: parseFloat(t.priceChangePercent),
+            try {
+              map[t.symbol] = {
+                price: parseFloat(t.lastPrice),
+                change: parseFloat(t.priceChangePercent),
+              }
+            } catch (e) {
+              console.error('Error parsing ticker:', t)
             }
           })
-          Object.entries(map).forEach(([symbol, d]) => {
+          Object.entries(map).forEach(([symbol, d]: any) => {
             useMarketStore.getState().setPrice(symbol, d)
           })
         }
+        setError(null)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load market data'
+        console.error('Binance API Error:', message)
+        setError(message)
+      } finally {
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+      }
+    }
 
-  const topMovers = Object.entries(prices || {})
-    .sort((a, b) => {
-      const changeA = (a[1] as any)?.change || 0
-      const changeB = (b[1] as any)?.change || 0
-      return Math.abs(changeB) - Math.abs(changeA)
-    })
-    .slice(0, 5)
+    fetchBinanceData()
+  }, [])
 
   return (
     <div style={{ padding: 24 }}>
@@ -106,82 +113,94 @@ export default function Dashboard() {
         </div>
       </AnimatedCard>
 
+      {/* Error Message */}
+      {error && (
+        <AnimatedCard delay={0.05}>
+          <div style={{ padding: 12, background: 'rgba(255, 71, 87, 0.1)', border: '1px solid rgba(255, 71, 87, 0.3)', borderRadius: 12, color: '#FF4757', marginBottom: 20, fontSize: 12 }}>
+            ⚠️ {error}
+          </div>
+        </AnimatedCard>
+      )}
+
       {/* Title */}
       <SlideIn direction="left" delay={0.1}>
         <h1 style={{ fontSize: 28, marginBottom: 20, color: '#F5F7FA' }}>Live Market Overview</h1>
       </SlideIn>
 
+      {/* Loading State */}
+      {loading && (
+        <AnimatedCard delay={0.15}>
+          <div style={{ padding: 40, textAlign: 'center', color: '#8FA3B8' }}>
+            Loading market data...
+          </div>
+        </AnimatedCard>
+      )}
+
       {/* Market Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginBottom: 30 }}>
-        {Object.entries(prices).slice(0, 12).map(([symbol, data]: any, index) => {
-          const change = data?.change || 0
-          const price = data?.price || 0
-          const isPos = change >= 0
-          return (
-            <AnimatedCard key={symbol} delay={0.05 * index}>
-              <div 
-                style={{
-                  background: 'rgba(16,24,38,0.7)',
-                  border: '1px solid rgba(0,229,212,0.08)',
-                  borderRadius: 12,
-                  padding: 16,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = 'rgba(16,24,38,0.9)'
-                  ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,229,212,0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = 'rgba(16,24,38,0.7)'
-                  ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,229,212,0.08)'
-                }}
-                onClick={() => window.location.href = `/coin/${symbol}`}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, color: '#F5F7FA' }}>{symbol.replace('USDT', '')}</div>
-                  <div style={{ color: isPos ? '#00E5A0' : '#FF4757', fontSize: 13 }}>
-                    {isPos ? '+' : ''}{change.toFixed(2)}%
+      {!loading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginBottom: 30 }}>
+          {Object.entries(prices).slice(0, 12).map(([symbol, data]: any, index) => {
+            const change = data?.change || 0
+            const price = data?.price || 0
+            const isPos = change >= 0
+            return (
+              <AnimatedCard key={symbol} delay={0.05 * index}>
+                <div 
+                  style={{
+                    background: 'rgba(16,24,38,0.7)',
+                    border: '1px solid rgba(0,229,212,0.08)',
+                    borderRadius: 12,
+                    padding: 16,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(16,24,38,0.9)'
+                    ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,229,212,0.2)'
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(16,24,38,0.7)'
+                    ;(e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,229,212,0.08)'
+                  }}
+                  onClick={() => window.location.href = `/coin/${symbol}`}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ fontWeight: 600, color: '#F5F7FA' }}>{symbol.replace('USDT', '')}</div>
+                    <div style={{ color: isPos ? '#00E5A0' : '#FF4757', fontSize: 13 }}>
+                      {isPos ? '+' : ''}{change.toFixed(2)}%
+                    </div>
                   </div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#00E5D4', marginBottom: 8 }}>
+                    ${fmt(price)}
+                  </div>
+                  <Sparkline data={genSpark(change, price)} color={isPos ? '#00E5A0' : '#FF4757'} />
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', color: '#00E5D4', marginBottom: 8 }}>
-                  ${fmt(price)}
-                </div>
-                <Sparkline data={genSpark(change, price)} color={isPos ? '#00E5A0' : '#FF4757'} />
-              </div>
-            </AnimatedCard>
-          )
-        })}
-      </div>
+              </AnimatedCard>
+            )
+          })}
+        </div>
+      )}
 
       {/* Professional Order Book */}
       <AnimatedCard delay={0.2}>
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-[#00E5D4] mb-4">Professional Order Book — BTCUSDT</h2>
+        <div style={{ marginTop: 30 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>Professional Order Book — BTCUSDT</h2>
           <ProfessionalOrderBook symbol="BTCUSDT" levels={20} />
         </div>
       </AnimatedCard>
 
       {/* HFT Analytics */}
       <AnimatedCard delay={0.25}>
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-[#00E5D4] mb-4">HFT Analytics — BTCUSDT</h2>
+        <div style={{ marginTop: 30 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>HFT Analytics — BTCUSDT</h2>
           <HFTAnalytics symbol="BTCUSDT" />
         </div>
       </AnimatedCard>
 
-      {/* Advanced Chart */}
-      <AnimatedCard delay={0.3}>
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-[#00E5D4] mb-4">Advanced Chart</h2>
-          <AdvancedTradingChart symbol="BTCUSDT" />
-        </div>
-      </AnimatedCard>
-
       {/* Footer */}
-      <AnimatedCard delay={0.35}>
+      <AnimatedCard delay={0.3}>
         <div style={{ marginTop: 30, padding: '12px 16px', background: 'rgba(16,24,38,0.6)', borderRadius: 10, textAlign: 'center', color: '#8FA3B8', fontSize: 13 }}>
-          {isConnected ? 'WebSocket подключён — данные обновляются в реальном времени' : 'Подключение к Binance...'}
+          {isConnected ? '✓ WebSocket connected — real-time data streaming' : '⟳ Connecting to data stream...'}
         </div>
       </AnimatedCard>
     </div>

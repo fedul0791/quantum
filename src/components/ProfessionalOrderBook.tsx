@@ -1,48 +1,54 @@
 'use client'
+import React, { useMemo } from 'react'
 import { useMarketStore } from '@/store/marketStore'
-import { useEffect, useState } from 'react'
 
-interface Props {
+interface ProfessionalOrderBookProps {
   symbol?: string
   levels?: number
 }
 
-export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 }: Props) {
+const ProfessionalOrderBook = React.memo(function ProfessionalOrderBook({ 
+  symbol = 'BTCUSDT', 
+  levels = 20 
+}: ProfessionalOrderBookProps) {
   const orderBook = useMarketStore(state => state.orderBooks[symbol])
-  const [depthLevel, setDepthLevel] = useState(levels)
-  
-  // Calculate heatmap color based on quantity
+
+  // Memoize computed values
+  const { bidData, askData, maxBidQty, maxAskQty, bestBid, bestAsk, spread, bidCumulative, askCumulative } = useMemo(() => {
+    const bids = orderBook?.bids?.slice(0, levels) || []
+    const asks = orderBook?.asks?.slice(0, levels) || []
+    
+    const bidQtys = bids.map(b => b[1])
+    const askQtys = asks.map(a => a[1])
+    const maxBidQty = bidQtys.length > 0 ? Math.max(...bidQtys) : 1
+    const maxAskQty = askQtys.length > 0 ? Math.max(...askQtys) : 1
+    
+    let bidCumulative = 0
+    const bidData = bids.map(([price, qty]) => {
+      bidCumulative += qty
+      return { price, qty, cumulative: bidCumulative }
+    })
+    
+    let askCumulative = 0
+    const askData = asks.map(([price, qty]) => {
+      askCumulative += qty
+      return { price, qty, cumulative: askCumulative }
+    })
+
+    const bestBid = bids[0]?.[0]
+    const bestAsk = asks[0]?.[0]
+    const spread = bestAsk && bestBid ? ((bestAsk - bestBid) / bestBid * 100).toFixed(4) : '—'
+
+    return { bidData, askData, maxBidQty, maxAskQty, bestBid, bestAsk, spread, bidCumulative, askCumulative }
+  }, [orderBook, levels])
+
   const getHeatmapColor = (qty: number, maxQty: number) => {
     const intensity = Math.min(qty / maxQty, 1)
-    
     if (intensity < 0.3) return 'rgba(0, 229, 212, 0.1)'
     if (intensity < 0.6) return 'rgba(0, 229, 212, 0.2)'
     if (intensity < 0.8) return 'rgba(0, 229, 212, 0.4)'
     return 'rgba(0, 229, 212, 0.6)'
   }
-
-  const bids = orderBook?.bids?.slice(0, depthLevel) || []
-  const asks = orderBook?.asks?.slice(0, depthLevel) || []
-  
-  const maxBidQty = Math.max(...bids.map(b => b[1]), 1)
-  const maxAskQty = Math.max(...asks.map(a => a[1]), 1)
-  
-  // Calculate cumulative quantities
-  let bidCumulative = 0
-  const bidData = bids.map(([price, qty]) => {
-    bidCumulative += qty
-    return { price, qty, cumulative: bidCumulative }
-  })
-  
-  let askCumulative = 0
-  const askData = asks.map(([price, qty]) => {
-    askCumulative += qty
-    return { price, qty, cumulative: askCumulative }
-  })
-
-  const bestBid = bids[0]?.[0]
-  const bestAsk = asks[0]?.[0]
-  const spread = bestAsk && bestBid ? ((bestAsk - bestBid) / bestBid * 100).toFixed(4) : '—'
 
   return (
     <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-6 h-full">
@@ -52,9 +58,8 @@ export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 
           {[10, 20, 50].map(l => (
             <button
               key={l}
-              onClick={() => setDepthLevel(l)}
               className={`px-2 py-1 rounded text-xs font-semibold transition ${
-                depthLevel === l
+                levels === l
                   ? 'bg-accent text-background'
                   : 'bg-surface-hover text-text-secondary hover:bg-secondary'
               }`}
@@ -65,7 +70,6 @@ export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 
         </div>
       </div>
 
-      {/* Spread Info */}
       <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-surface-hover rounded border border-accent border-opacity-20">
         <div>
           <div className="text-xs text-text-secondary">Best Bid</div>
@@ -92,9 +96,7 @@ export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 
                 <div
                   key={i}
                   className="relative flex justify-between text-xs font-mono group"
-                  style={{
-                    background: heatmapBg,
-                  }}
+                  style={{ background: heatmapBg }}
                 >
                   <div className="absolute right-0 top-0 bottom-0 w-full" 
                     style={{
@@ -120,9 +122,7 @@ export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 
                 <div
                   key={i}
                   className="relative flex justify-between text-xs font-mono group"
-                  style={{
-                    background: heatmapBg,
-                  }}
+                  style={{ background: heatmapBg }}
                 >
                   <div className="absolute right-0 top-0 bottom-0 w-full"
                     style={{
@@ -162,4 +162,6 @@ export default function ProfessionalOrderBook({ symbol = 'BTCUSDT', levels = 20 
       </div>
     </div>
   )
-}
+})
+
+export default ProfessionalOrderBook

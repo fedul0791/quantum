@@ -1,38 +1,31 @@
 'use client'
 import { useState } from 'react'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import { ToastProvider } from '@/components/Toast'
 import './globals.css'
 
 const menuItems = [
-  { name: 'Главная', icon: '◈', id: 'dashboard' },
-  { name: 'Графики', icon: '⊟', id: 'chart' },
-  { name: 'Стакан', icon: '⊞', id: 'orderbook' },
-  { name: 'HFT и LOB Метрики', icon: '⟐', id: 'hft' },
-  { name: 'Микроструктура', icon: '⧈', id: 'microstructure' },
-  { name: 'Оповещение', icon: '⚡', id: 'alerts' },
-  { name: 'Избранное', icon: '★', id: 'watchlist' },
+  { name: 'Dashboard', icon: '◈', id: 'dashboard', path: '/' },
+  { name: 'Microstructure', icon: '⧈', id: 'microstructure', path: '/microstructure' },
+  { name: 'Alerts', icon: '⚡', id: 'alerts', path: '/alerts' },
+  { name: 'Watchlists', icon: '★', id: 'watchlist', path: '/watchlist' },
+  { name: 'Replay', icon: '⟳', id: 'replay', path: '/replay' },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false)
   const [activeItem, setActiveItem] = useState('dashboard')
 
-  const handleNav = (id: string) => {
+  const handleNav = (id: string, path: string) => {
     setActiveItem(id)
-    const paths: Record<string, string> = {
-      dashboard: '/',
-      chart: '/chart',
-      orderbook: '/orderbook',
-      hft: '/hft',
-      microstructure: '/microstructure',
-      alerts: '/alerts',
-      watchlist: '/watchlist',
-    }
-    window.location.href = paths[id] || '/'
+    window.location.href = path
   }
 
   return (
-    <html lang="ru">
+    <html lang="en">
       <body>
+        <ErrorBoundary>
+          <ToastProvider>
         <div className="flex h-screen">
           {/* Sidebar */}
           <div 
@@ -54,23 +47,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               position: 'relative',
             }}
           >
-            {/* Логотип */}
+            {/* Logo */}
             <div className="mb-8 px-3 flex items-center gap-3">
               <div className="text-3xl">₿</div>
               <div>
-                <div className="text-[#00E5D4] font-bold text-xl">Quantum Flow</div>
-                <div className="text-xs text-[#8FA3B8]">Terminal</div>
+                <div className="text-[#00E5D4] font-bold text-xl">Quantum</div>
+                <div className="text-xs text-[#8FA3B8]">Flow</div>
               </div>
             </div>
 
-            {/* Меню */}
+            {/* Menu */}
             <div className="flex-1 space-y-1">
               {menuItems.map((item) => {
                 const isActive = activeItem === item.id
                 return (
                   <div 
                     key={item.id}
-                    onClick={() => handleNav(item.id)}
+                    onClick={() => handleNav(item.id, item.path)}
                     style={{
                       color: isActive ? '#00E5D4' : '#8FA3B8',
                       padding: '12px 16px',
@@ -92,13 +85,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 )
               })}
             </div>
+
+            {/* Footer */}
+            <div style={{
+              paddingTop: 16,
+              borderTop: '1px solid rgba(0,229,212,0.08)',
+              textAlign: 'center',
+              color: '#5C728A',
+              fontSize: 10,
+            }}>
+              {expanded && 'v1.0'}
+            </div>
           </div>
 
-          {/* Основной контент */}
+          {/* Main Content */}
           <div className="flex-1 overflow-auto bg-[#070B12]">
             {children}
           </div>
         </div>
+          </ToastProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

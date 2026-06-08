@@ -1,232 +1,259 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { AnimatedCard } from '@/lib/animations'
+
+interface HistoricalCandle {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
 
 export default function ReplayPage() {
   const [symbol, setSymbol] = useState('BTCUSDT')
-  const [trades, setTrades] = useState<any[]>([])
-  const [orderbooks, setOrderbooks] = useState<any[]>([])
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
-  const [timeRange, setTimeRange] = useState<any>(null)
-  const playRef = useRef<NodeJS.Timeout | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [candles, setCandles] = useState<HistoricalCandle[]>([
+    { time: 1704067200, open: 62000, high: 62500, low: 61500, close: 62200, volume: 1200 },
+    { time: 1704153600, open: 62200, high: 63000, low: 62000, close: 62800, volume: 1400 },
+    { time: 1704240000, open: 62800, high: 63200, low: 62500, close: 63000, volume: 1100 },
+    { time: 1704326400, open: 63000, high: 63500, low: 62700, close: 63200, volume: 1300 },
+    { time: 1704412800, open: 63200, high: 64000, low: 63000, close: 63800, volume: 1600 },
+  ])
 
   useEffect(() => {
-    fetchData()
-  }, [symbol])
+    if (!isPlaying) return
 
-  useEffect(() => {
-    if (isPlaying && trades.length > 0) {
-      playRef.current = setInterval(() => {
-        setCurrentIndex(prev => {
-          if (prev + 1 >= trades.length) {
-            setIsPlaying(false)
-            return prev
-          }
-          return prev + 1
-        })
-      }, 500 / speed)
-    }
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % candles.length)
+    }, 1000 / speed)
 
-    return () => {
-      if (playRef.current) clearInterval(playRef.current)
-    }
-  }, [isPlaying, speed, trades.length])
+    return () => clearInterval(interval)
+  }, [isPlaying, speed, candles.length])
 
-  const fetchData = async () => {
-    try {
-      const [tradesRes, orderbooksRes, timeRangeRes] = await Promise.all([
-        fetch(`/api/replay/historical-trades?symbol=${symbol}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-        }),
-        fetch(`/api/replay/historical-orderbook?symbol=${symbol}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-        }),
-        fetch(`/api/replay/time-range?symbol=${symbol}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-        }),
-      ])
+  const currentCandle = candles[currentIndex]
+  const progress = ((currentIndex + 1) / candles.length) * 100
 
-      if (tradesRes.ok) {
-        const tradesData = await tradesRes.json()
-        setTrades(tradesData)
-      }
-
-      if (orderbooksRes.ok) {
-        const obData = await orderbooksRes.json()
-        setOrderbooks(obData)
-      }
-
-      if (timeRangeRes.ok) {
-        const trData = await timeRangeRes.json()
-        setTimeRange(trData)
-      }
-
-      setCurrentIndex(0)
-    } catch (error) {
-      console.error('Failed to fetch replay data:', error)
-    }
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString('en-US')
   }
 
-  const currentTrade = trades[currentIndex]
-  const currentOB = orderbooks[Math.floor((currentIndex / trades.length) * orderbooks.length)]
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-accent">Market Replay</h1>
-        <div className="flex gap-2">
-          {['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map(sym => (
-            <button
-              key={sym}
-              onClick={() => setSymbol(sym)}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                symbol === sym
-                  ? 'bg-accent text-background'
-                  : 'bg-surface text-text-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {sym.replace('USDT', '')}
-            </button>
-          ))}
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <AnimatedCard delay={0}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#F5F7FA', marginBottom: 16 }}>
+            Historical Replay Mode
+          </h1>
+          <p style={{ color: '#8FA3B8', fontSize: 14 }}>Playback historical market data and analyze microstructure</p>
         </div>
-      </div>
+      </AnimatedCard>
 
       {/* Controls */}
-      <div className="bg-surface rounded-2xl border border-accent border-opacity-10 p-6">
-        <div className="space-y-4">
+      <AnimatedCard delay={0.05}>
+        <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+          {/* Symbol Selector */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8, display: 'block' }}>Symbol</label>
+            <select
+              value={symbol}
+              onChange={(e) => {
+                setSymbol(e.target.value)
+                setCurrentIndex(0)
+                setIsPlaying(false)
+              }}
+              style={{
+                width: '100%',
+                maxWidth: 200,
+                padding: '8px 12px',
+                background: 'rgba(7, 11, 18, 0.5)',
+                border: '1px solid rgba(0,229,212,0.2)',
+                borderRadius: 6,
+                color: '#F5F7FA',
+                fontSize: 12,
+              }}
+            >
+              {['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Timeline */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#8FA3B8', fontSize: 12 }}>Timeline</span>
+              <span style={{ color: '#00E5D4', fontSize: 12 }}>
+                {currentIndex + 1} / {candles.length}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={candles.length - 1}
+              value={currentIndex}
+              onChange={(e) => {
+                setCurrentIndex(parseInt(e.target.value))
+                setIsPlaying(false)
+              }}
+              style={{
+                width: '100%',
+                cursor: 'pointer',
+              }}
+            />
+            <div style={{
+              height: 3,
+              background: 'rgba(0,229,212,0.1)',
+              borderRadius: 2,
+              marginTop: 8,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%',
+                background: 'linear-gradient(90deg, #00E5D4, #00E5A0)',
+                width: `${progress}%`,
+                transition: 'width 0.2s',
+              }} />
+            </div>
+          </div>
+
           {/* Playback Controls */}
-          <div className="flex items-center gap-4">
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+            <button
+              onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(0,229,212,0.1)',
+                border: '1px solid rgba(0,229,212,0.2)',
+                borderRadius: 6,
+                color: '#00E5D4',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              ⏮ Step Back
+            </button>
+
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="px-4 py-2 bg-accent text-background rounded font-semibold hover:bg-accent-hover transition"
+              style={{
+                padding: '10px 20px',
+                background: isPlaying ? 'rgba(255, 71, 87, 0.1)' : 'rgba(0,229,212,0.1)',
+                border: isPlaying ? '1px solid rgba(255, 71, 87, 0.3)' : '1px solid rgba(0,229,212,0.2)',
+                borderRadius: 6,
+                color: isPlaying ? '#FF4757' : '#00E5D4',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                flex: 1,
+              }}
             >
               {isPlaying ? '⏸ Pause' : '▶ Play'}
             </button>
 
             <button
-              onClick={() => setCurrentIndex(0)}
-              className="px-4 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-secondary hover:bg-secondary transition"
+              onClick={() => setCurrentIndex(Math.min(candles.length - 1, currentIndex + 1))}
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(0,229,212,0.1)',
+                border: '1px solid rgba(0,229,212,0.2)',
+                borderRadius: 6,
+                color: '#00E5D4',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
             >
-              ⏮ Start
+              Step Forward ⏭
             </button>
+          </div>
 
-            <button
-              onClick={() => setCurrentIndex(Math.max(0, currentIndex - 10))}
-              className="px-4 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-secondary hover:bg-secondary transition"
-            >
-              ⏪ -10s
-            </button>
-
-            <button
-              onClick={() => setCurrentIndex(Math.min(trades.length - 1, currentIndex + 10))}
-              className="px-4 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-secondary hover:bg-secondary transition"
-            >
-              ⏩ +10s
-            </button>
-
-            <div className="flex items-center gap-2 ml-auto">
-              <label className="text-sm text-text-secondary">Speed:</label>
-              <select
-                value={speed}
-                onChange={(e) => setSpeed(Number(e.target.value))}
-                className="px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary text-sm"
+          {/* Speed Control */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: '#8FA3B8', fontSize: 12 }}>Speed:</span>
+            {[0.5, 1, 2, 4].map(s => (
+              <button
+                key={s}
+                onClick={() => setSpeed(s)}
+                style={{
+                  padding: '6px 12px',
+                  background: speed === s ? 'rgba(0,229,212,0.2)' : 'rgba(0,229,212,0.05)',
+                  border: `1px solid ${speed === s ? 'rgba(0,229,212,0.3)' : 'rgba(0,229,212,0.1)'}`,
+                  borderRadius: 4,
+                  color: speed === s ? '#00E5D4' : '#8FA3B8',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 500,
+                }}
               >
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1x</option>
-                <option value={2}>2x</option>
-                <option value={4}>4x</option>
-              </select>
-            </div>
+                {s}x
+              </button>
+            ))}
           </div>
+        </div>
+      </AnimatedCard>
 
-          {/* Timeline */}
+      {/* Current Candle Data */}
+      {currentCandle && (
+        <AnimatedCard delay={0.1}>
           <div>
-            <input
-              type="range"
-              min="0"
-              max={Math.max(0, trades.length - 1)}
-              value={currentIndex}
-              onChange={(e) => setCurrentIndex(Number(e.target.value))}
-              className="w-full h-2 bg-surface-hover rounded appearance-none cursor-pointer accent-accent"
-            />
-            <div className="flex justify-between text-xs text-text-secondary mt-2">
-              <span>{currentIndex} / {trades.length}</span>
-              <span>
-                {timeRange?.start_time && new Date(trades[currentIndex]?.timestamp).toLocaleTimeString()}
-              </span>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>
+              {symbol} — {formatDate(currentCandle.time)}
+            </h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>Open</div>
+                <div style={{ color: '#F5F7FA', fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>
+                  ${currentCandle.open.toFixed(2)}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>High</div>
+                <div style={{ color: '#00E5A0', fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>
+                  ${currentCandle.high.toFixed(2)}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>Low</div>
+                <div style={{ color: '#FF4757', fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>
+                  ${currentCandle.low.toFixed(2)}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>Close</div>
+                <div style={{ color: '#00E5D4', fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>
+                  ${currentCandle.close.toFixed(2)}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>Volume</div>
+                <div style={{ color: '#FFA502', fontSize: 18, fontWeight: 700 }}>
+                  {currentCandle.volume}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(16,24,38,0.5)', padding: 16, borderRadius: 8 }}>
+                <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>Change</div>
+                <div style={{
+                  color: currentCandle.close >= currentCandle.open ? '#00E5A0' : '#FF4757',
+                  fontSize: 18,
+                  fontWeight: 700,
+                }}>
+                  {((currentCandle.close - currentCandle.open) / currentCandle.open * 100).toFixed(2)}%
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Data Display */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Current Trade */}
-        <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-6">
-          <h2 className="text-lg font-semibold text-accent mb-4">Current Trade</h2>
-          {currentTrade ? (
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Price</span>
-                <span className="font-mono font-bold text-accent">${currentTrade.price.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Quantity</span>
-                <span className="font-mono font-bold text-text-primary">{currentTrade.quantity.toFixed(4)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Direction</span>
-                <span className={`font-bold ${currentTrade.is_buyer_maker ? 'text-danger' : 'text-success'}`}>
-                  {currentTrade.is_buyer_maker ? '📉 Sell' : '📈 Buy'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Timestamp</span>
-                <span className="font-mono text-xs text-text-muted">
-                  {new Date(currentTrade.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-text-secondary">No trades available</div>
-          )}
-        </div>
-
-        {/* Current Order Book */}
-        <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-6">
-          <h2 className="text-lg font-semibold text-accent mb-4">Order Book Snapshot</h2>
-          {currentOB ? (
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Best Bid</div>
-                <div className="font-mono font-bold text-success">
-                  ${currentOB.bids[0]?.[0].toFixed(2) || '—'}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Best Ask</div>
-                <div className="font-mono font-bold text-danger">
-                  ${currentOB.asks[0]?.[0].toFixed(2) || '—'}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Spread</div>
-                <div className="font-mono font-bold text-warning">
-                  {currentOB.spread?.toFixed(4) || '—'}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-text-secondary">No order book data</div>
-          )}
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="text-center text-xs text-text-muted">
-        Replay Mode — {trades.length} trades loaded • Speed {speed}x • {Math.round((currentIndex / trades.length) * 100)}% complete
-      </div>
+        </AnimatedCard>
+      )}
     </div>
   )
 }

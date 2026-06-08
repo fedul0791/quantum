@@ -1,167 +1,128 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useMarketStore } from '@/store/marketStore'
-import HFTAnalytics from '@/components/HFTAnalytics'
 import ProfessionalOrderBook from '@/components/ProfessionalOrderBook'
+import HFTAnalytics from '@/components/HFTAnalytics'
+import { AnimatedCard } from '@/lib/animations'
 
-export default function MicrostructureDashboard() {
-  const [symbol, setSymbol] = useState('BTCUSDT')
-  const [metrics, setMetrics] = useState<any>(null)
-  const [spreadHistory, setSpreadHistory] = useState<any[]>([])
+const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT']
 
-  useEffect(() => {
-    // Fetch microstructure metrics from API
-    const fetchMetrics = async () => {
-      try {
-        const response = await fetch(`/api/hft/metrics?symbol=${symbol}`)
-        if (response.ok) {
-          const data = await response.json()
-          setMetrics(data)
-        }
-      } catch (error) {
-        console.error('Failed to fetch metrics:', error)
-      }
-    }
-
-    const fetchSpreadHistory = async () => {
-      try {
-        const response = await fetch(`/api/orderbook/spread-history?symbol=${symbol}`)
-        if (response.ok) {
-          const data = await response.json()
-          setSpreadHistory(data)
-        }
-      } catch (error) {
-        console.error('Failed to fetch spread history:', error)
-      }
-    }
-
-    fetchMetrics()
-    fetchSpreadHistory()
-
-    const interval = setInterval(() => {
-      fetchMetrics()
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [symbol])
+export default function Microstructure() {
+  const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT')
+  const orderBook = useMarketStore(state => state.orderBooks[selectedSymbol])
+  
+  const bidLevels = orderBook?.bids?.length || 0
+  const askLevels = orderBook?.asks?.length || 0
+  const totalLiquidity = (orderBook?.bids || []).reduce((sum, [_, qty]) => sum + qty, 0) +
+                         (orderBook?.asks || []).reduce((sum, [_, qty]) => sum + qty, 0)
 
   return (
-    <div className="p-6 space-y-6">
+    <div style={{ padding: 24 }}>
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-accent">Market Microstructure Analysis</h1>
-        <div className="flex gap-2">
-          {['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].map(sym => (
-            <button
-              key={sym}
-              onClick={() => setSymbol(sym)}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                symbol === sym
-                  ? 'bg-accent text-background'
-                  : 'bg-surface text-text-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {sym.replace('USDT', '')}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left Column - HFT Metrics */}
-        <div className="col-span-1">
-          <HFTAnalytics symbol={symbol} />
-        </div>
-
-        {/* Middle Column - Order Book */}
-        <div className="col-span-1">
-          <ProfessionalOrderBook symbol={symbol} levels={20} />
-        </div>
-
-        {/* Right Column - Liquidity Metrics */}
-        <div className="col-span-1 space-y-4">
-          {/* Spread Evolution */}
-          <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-4">
-            <h3 className="text-sm font-semibold text-accent mb-3">SPREAD EVOLUTION</h3>
-            <div className="space-y-2">
-              {spreadHistory.slice(-5).map((item, i) => (
-                <div key={i} className="flex justify-between items-center text-xs">
-                  <span className="text-text-secondary">{new Date(item.timestamp).toLocaleTimeString()}</span>
-                  <span className="text-warning font-mono">{item.spread?.toFixed(4) || '—'}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Market Pressure */}
-          <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-4">
-            <h3 className="text-sm font-semibold text-accent mb-3">MARKET PRESSURE</h3>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-text-secondary">Buying Pressure</span>
-                  <span className="text-success">65%</span>
-                </div>
-                <div className="h-2 bg-surface-hover rounded overflow-hidden">
-                  <div className="h-full bg-success" style={{ width: '65%' }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-text-secondary">Selling Pressure</span>
-                  <span className="text-danger">35%</span>
-                </div>
-                <div className="h-2 bg-surface-hover rounded overflow-hidden">
-                  <div className="h-full bg-danger" style={{ width: '35%' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Liquidity Walls */}
-          <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-4">
-            <h3 className="text-sm font-semibold text-accent mb-3">LIQUIDITY WALLS</h3>
-            <div className="space-y-2 text-xs">
-              <div className="p-2 bg-surface-hover rounded border border-danger border-opacity-30">
-                <div className="flex justify-between">
-                  <span className="text-danger">Ask Wall</span>
-                  <span className="text-text-secondary">$62,500 (3.5 BTC)</span>
-                </div>
-              </div>
-              <div className="p-2 bg-surface-hover rounded border border-success border-opacity-30">
-                <div className="flex justify-between">
-                  <span className="text-success">Bid Wall</span>
-                  <span className="text-text-secondary">$61,800 (4.2 BTC)</span>
-                </div>
-              </div>
-            </div>
+      <AnimatedCard delay={0}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#F5F7FA', marginBottom: 16 }}>
+            Market Microstructure Analysis
+          </h1>
+          
+          {/* Symbol Selector */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {symbols.map(sym => (
+              <button
+                key={sym}
+                onClick={() => setSelectedSymbol(sym)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  border: selectedSymbol === sym ? '1px solid #00E5D4' : '1px solid rgba(0,229,212,0.2)',
+                  background: selectedSymbol === sym ? 'rgba(0,229,212,0.1)' : 'rgba(16,24,38,0.5)',
+                  color: selectedSymbol === sym ? '#00E5D4' : '#8FA3B8',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {sym}
+              </button>
+            ))}
           </div>
         </div>
+      </AnimatedCard>
+
+      {/* Metrics Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <AnimatedCard delay={0.05}>
+          <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 16 }}>
+            <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>BID LEVELS</div>
+            <div style={{ color: '#00E5D4', fontSize: 24, fontWeight: 700 }}>{bidLevels}</div>
+          </div>
+        </AnimatedCard>
+        
+        <AnimatedCard delay={0.1}>
+          <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 16 }}>
+            <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>ASK LEVELS</div>
+            <div style={{ color: '#FF4757', fontSize: 24, fontWeight: 700 }}>{askLevels}</div>
+          </div>
+        </AnimatedCard>
+        
+        <AnimatedCard delay={0.15}>
+          <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 16 }}>
+            <div style={{ color: '#8FA3B8', fontSize: 12, marginBottom: 8 }}>TOTAL LIQUIDITY</div>
+            <div style={{ color: '#FFA502', fontSize: 24, fontWeight: 700 }}>{totalLiquidity.toFixed(0)}</div>
+          </div>
+        </AnimatedCard>
       </div>
 
-      {/* Bottom Section - Advanced Metrics */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Avg Spread', value: '2.5', unit: 'bps', color: 'warning' },
-          { label: 'Order Book Imbalance', value: '0.23', unit: '', color: 'accent' },
-          { label: 'Liquidity Ratio', value: '1.85', unit: 'x', color: 'success' },
-          { label: 'Realized Vol (1m)', value: '0.45', unit: '%', color: 'info' },
-        ].map((metric, i) => (
-          <div key={i} className="rounded-2xl bg-surface border border-accent border-opacity-10 p-4">
-            <div className="text-xs text-text-secondary mb-2">{metric.label}</div>
-            <div className={`text-2xl font-mono font-bold text-${metric.color}`}>
-              {metric.value}
-              <span className="text-sm ml-1">{metric.unit}</span>
+      {/* Main Content Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+        {/* Order Book */}
+        <AnimatedCard delay={0.2}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>
+              Order Book Depth — {selectedSymbol}
+            </h2>
+            <ProfessionalOrderBook symbol={selectedSymbol} levels={20} />
+          </div>
+        </AnimatedCard>
+
+        {/* HFT Analytics */}
+        <AnimatedCard delay={0.25}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>
+              HFT Microstructure
+            </h2>
+            <HFTAnalytics symbol={selectedSymbol} />
+          </div>
+        </AnimatedCard>
+      </div>
+
+      {/* Advanced Metrics */}
+      <AnimatedCard delay={0.3}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>
+            Market Pressure Indicators
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            <div style={{ background: 'rgba(16,24,38,0.5)', padding: 12, borderRadius: 8 }}>
+              <div style={{ color: '#8FA3B8', fontSize: 11, marginBottom: 6 }}>Bid Imbalance</div>
+              <div style={{ color: '#00E5A0', fontSize: 16, fontWeight: 600 }}>+12.3%</div>
+            </div>
+            <div style={{ background: 'rgba(16,24,38,0.5)', padding: 12, borderRadius: 8 }}>
+              <div style={{ color: '#8FA3B8', fontSize: 11, marginBottom: 6 }}>Ask Pressure</div>
+              <div style={{ color: '#FF4757', fontSize: 16, fontWeight: 600 }}>-8.7%</div>
+            </div>
+            <div style={{ background: 'rgba(16,24,38,0.5)', padding: 12, borderRadius: 8 }}>
+              <div style={{ color: '#8FA3B8', fontSize: 11, marginBottom: 6 }}>Spread Change</div>
+              <div style={{ color: '#FFA502', fontSize: 16, fontWeight: 600 }}>+2.1 bps</div>
+            </div>
+            <div style={{ background: 'rgba(16,24,38,0.5)', padding: 12, borderRadius: 8 }}>
+              <div style={{ color: '#8FA3B8', fontSize: 11, marginBottom: 6 }}>Market Depth</div>
+              <div style={{ color: '#00E5D4', fontSize: 16, fontWeight: 600 }}>Deep</div>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Footer Info */}
-      <div className="text-center text-xs text-text-muted pt-4">
-        Updates every 100ms • Data from order book snapshots • Designed for HFT analysis
-      </div>
+        </div>
+      </AnimatedCard>
     </div>
   )
 }

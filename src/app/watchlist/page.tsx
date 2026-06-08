@@ -1,248 +1,386 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { AnimatedCard } from '@/lib/animations'
+
+interface Watchlist {
+  id: number
+  name: string
+  symbols: string[]
+  is_default: boolean
+}
+
+const availableSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
 
 export default function WatchlistPage() {
-  const [watchlists, setWatchlists] = useState<any[]>([])
-  const [selectedWatchlist, setSelectedWatchlist] = useState<any>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    symbols: [] as string[],
-  })
-  const [newSymbol, setNewSymbol] = useState('')
+  const [watchlists, setWatchlists] = useState<Watchlist[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newWatchlistName, setNewWatchlistName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [selectedSymbol, setSelectedSymbol] = useState('')
+  const [editingWatchlist, setEditingWatchlist] = useState<number | null>(null)
 
-  const allSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT']
-
+  // Fetch watchlists on mount
   useEffect(() => {
     fetchWatchlists()
   }, [])
 
   const fetchWatchlists = async () => {
     try {
-      const response = await fetch('/api/watchlists/list', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/watchlists', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
-      if (response.ok) {
-        const data = await response.json()
-        setWatchlists(data)
-        if (data.length > 0) {
-          setSelectedWatchlist(data[0])
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch watchlists:', error)
+
+      if (!response.ok) throw new Error('Failed to load watchlists')
+      const data = await response.json()
+      setWatchlists(Array.isArray(data) ? data : [])
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load watchlists'
+      setError(message)
+      console.error('Watchlists fetch error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleCreateWatchlist = async () => {
-    if (!formData.name) return
+  const createWatchlist = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newWatchlistName.trim()) return
 
+    setCreating(true)
     try {
-      const response = await fetch('/api/watchlists/create', {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/watchlists', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ name: newWatchlistName }),
       })
-      if (response.ok) {
-        setShowCreateModal(false)
-        fetchWatchlists()
-        setFormData({ name: '', description: '', symbols: [] })
-      }
-    } catch (error) {
-      console.error('Failed to create watchlist:', error)
+
+      if (!response.ok) throw new Error('Failed to create watchlist')
+      
+      await fetchWatchlists()
+      setNewWatchlistName('')
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create watchlist'
+      setError(message)
+      console.error('Watchlist creation error:', err)
+    } finally {
+      setCreating(false)
     }
   }
 
-  const handleAddSymbol = async (watchlistId: string, symbol: string) => {
+  const deleteWatchlist = async (id: number) => {
     try {
-      const response = await fetch(`/api/watchlists/${watchlistId}/add-symbol?symbol=${symbol}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      })
-      if (response.ok) {
-        fetchWatchlists()
-      }
-    } catch (error) {
-      console.error('Failed to add symbol:', error)
-    }
-  }
-
-  const handleRemoveSymbol = async (watchlistId: string, symbol: string) => {
-    try {
-      const response = await fetch(`/api/watchlists/${watchlistId}/remove-symbol?symbol=${symbol}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      })
-      if (response.ok) {
-        fetchWatchlists()
-      }
-    } catch (error) {
-      console.error('Failed to remove symbol:', error)
-    }
-  }
-
-  const handleDeleteWatchlist = async (watchlistId: string) => {
-    try {
-      const response = await fetch(`/api/watchlists/${watchlistId}`, {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/watchlists/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
-      if (response.ok) {
-        fetchWatchlists()
-        setSelectedWatchlist(null)
-      }
-    } catch (error) {
-      console.error('Failed to delete watchlist:', error)
+
+      if (!response.ok) throw new Error('Failed to delete watchlist')
+      await fetchWatchlists()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete watchlist'
+      setError(message)
+      console.error('Watchlist deletion error:', err)
+    }
+  }
+
+  const toggleDefault = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/watchlists/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ is_default: true }),
+      })
+
+      if (!response.ok) throw new Error('Failed to update watchlist')
+      await fetchWatchlists()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update watchlist'
+      setError(message)
+      console.error('Watchlist update error:', err)
+    }
+  }
+
+  const addSymbol = async (watchlistId: number, symbol: string) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/watchlists/${watchlistId}/symbols`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ symbol }),
+      })
+
+      if (!response.ok) throw new Error('Failed to add symbol')
+      await fetchWatchlists()
+      setSelectedSymbol('')
+      setEditingWatchlist(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to add symbol'
+      setError(message)
+      console.error('Symbol add error:', err)
+    }
+  }
+
+  const removeSymbol = async (watchlistId: number, symbol: string) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/watchlists/${watchlistId}/symbols/${symbol}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      })
+
+      if (!response.ok) throw new Error('Failed to remove symbol')
+      await fetchWatchlists()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to remove symbol'
+      setError(message)
+      console.error('Symbol remove error:', err)
     }
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-accent">My Watchlists</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-accent text-background rounded font-semibold hover:bg-accent-hover transition"
-        >
-          + New Watchlist
-        </button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-6">
-        {/* Watchlist List */}
-        <div className="col-span-1 rounded-2xl bg-surface border border-accent border-opacity-10 p-4">
-          <h2 className="font-semibold text-accent mb-4">Watchlists</h2>
-          <div className="space-y-2">
-            {watchlists.map(wl => (
-              <button
-                key={wl.id}
-                onClick={() => setSelectedWatchlist(wl)}
-                className={`w-full text-left px-3 py-2 rounded transition ${
-                  selectedWatchlist?.id === wl.id
-                    ? 'bg-accent text-background'
-                    : 'bg-surface-hover text-text-secondary hover:bg-secondary'
-                }`}
-              >
-                <div className="font-semibold">{wl.name}</div>
-                <div className="text-xs">{wl.symbols.length} symbols</div>
-              </button>
-            ))}
-            {watchlists.length === 0 && (
-              <div className="text-center text-text-secondary text-sm py-8">No watchlists yet</div>
-            )}
-          </div>
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <AnimatedCard delay={0}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#F5F7FA', marginBottom: 8 }}>
+            My Watchlists
+          </h1>
+          <p style={{ color: '#8FA3B8', fontSize: 14 }}>Organize and track your favorite cryptocurrencies</p>
         </div>
+      </AnimatedCard>
 
-        {/* Watchlist Detail */}
-        {selectedWatchlist && (
-          <div className="col-span-3 rounded-2xl bg-surface border border-accent border-opacity-10 p-6">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-accent">{selectedWatchlist.name}</h2>
-                {selectedWatchlist.description && (
-                  <p className="text-text-secondary mt-1">{selectedWatchlist.description}</p>
-                )}
-              </div>
-              <button
-                onClick={() => handleDeleteWatchlist(selectedWatchlist.id)}
-                className="text-danger hover:text-danger text-sm transition"
-              >
-                Delete
-              </button>
-            </div>
+      {/* Error Message */}
+      {error && (
+        <AnimatedCard delay={0.02}>
+          <div style={{
+            padding: 12,
+            background: 'rgba(255, 71, 87, 0.1)',
+            border: '1px solid rgba(255, 71, 87, 0.3)',
+            borderRadius: 12,
+            color: '#FF4757',
+            marginBottom: 20,
+            fontSize: 12,
+          }}>
+            ⚠️ {error}
+          </div>
+        </AnimatedCard>
+      )}
 
-            {/* Current Symbols */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Symbols ({selectedWatchlist.symbols.length})</h3>
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                {selectedWatchlist.symbols.map((symbol: string) => (
-                  <div
-                    key={symbol}
-                    className="p-3 bg-surface-hover rounded border border-accent border-opacity-20 flex justify-between items-center"
-                  >
-                    <span className="font-semibold text-accent">{symbol}</span>
-                    <button
-                      onClick={() => handleRemoveSymbol(selectedWatchlist.id, symbol)}
-                      className="text-danger hover:text-danger transition"
-                    >
-                      ✕
-                    </button>
+      {/* Create Watchlist */}
+      <AnimatedCard delay={0.05}>
+        <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>Create Watchlist</h2>
+          
+          <form onSubmit={createWatchlist} style={{ display: 'flex', gap: 12 }}>
+            <input
+              type="text"
+              placeholder="Enter watchlist name..."
+              value={newWatchlistName}
+              onChange={(e) => setNewWatchlistName(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                background: 'rgba(7, 11, 18, 0.5)',
+                border: '1px solid rgba(0,229,212,0.2)',
+                borderRadius: 6,
+                color: '#F5F7FA',
+                fontSize: 12,
+              }}
+            />
+            <button
+              type="submit"
+              disabled={creating || loading}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(0,229,212,0.1)',
+                border: '1px solid rgba(0,229,212,0.3)',
+                borderRadius: 6,
+                color: '#00E5D4',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: creating || loading ? 'not-allowed' : 'pointer',
+                opacity: creating || loading ? 0.6 : 1,
+              }}
+            >
+              Create
+            </button>
+          </form>
+        </div>
+      </AnimatedCard>
+
+      {/* Watchlists Grid */}
+      {loading ? (
+        <AnimatedCard delay={0.1}>
+          <div style={{ padding: 24, textAlign: 'center', color: '#8FA3B8' }}>
+            Loading watchlists...
+          </div>
+        </AnimatedCard>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {watchlists.map((watchlist, idx) => (
+            <AnimatedCard key={watchlist.id} delay={0.05 + idx * 0.05}>
+              <div style={{
+                background: 'rgba(16,24,38,0.6)',
+                border: watchlist.is_default ? '1px solid rgba(0,229,212,0.3)' : '1px solid rgba(0,229,212,0.1)',
+                borderRadius: 12,
+                padding: 16,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ color: '#F5F7FA', fontSize: 14, fontWeight: 600 }}>{watchlist.name}</h3>
+                    {watchlist.is_default && (
+                      <div style={{ color: '#00E5D4', fontSize: 10, marginTop: 4 }}>★ Default</div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
+                  <button
+                    onClick={() => deleteWatchlist(watchlist.id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#8FA3B8',
+                      cursor: 'pointer',
+                      fontSize: 16,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
 
-            {/* Add Symbols */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Add Symbols</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {allSymbols
-                  .filter(sym => !selectedWatchlist.symbols.includes(sym))
-                  .map(symbol => (
+                {/* Symbols */}
+                <div style={{ marginBottom: 16 }}>
+                  {watchlist.symbols.length === 0 ? (
+                    <div style={{ color: '#5C728A', fontSize: 12, textAlign: 'center', padding: '12px 0' }}>
+                      No symbols added
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                      {watchlist.symbols.map(sym => (
+                        <div key={sym} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div
+                            style={{
+                              background: 'rgba(0,229,212,0.1)',
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              color: '#00E5D4',
+                              fontSize: 11,
+                              fontWeight: 500,
+                            }}
+                          >
+                            {sym}
+                          </div>
+                          <button
+                            onClick={() => removeSymbol(watchlist.id, sym)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#FF4757',
+                              cursor: 'pointer',
+                              fontSize: 12,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Add Symbol */}
+                  {editingWatchlist === watchlist.id ? (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select
+                        value={selectedSymbol}
+                        onChange={(e) => setSelectedSymbol(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          background: 'rgba(7, 11, 18, 0.5)',
+                          border: '1px solid rgba(0,229,212,0.2)',
+                          borderRadius: 4,
+                          color: '#F5F7FA',
+                          fontSize: 11,
+                        }}
+                      >
+                        <option value="">Select symbol...</option>
+                        {availableSymbols.filter(s => !watchlist.symbols.includes(s)).map(s => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (selectedSymbol) addSymbol(watchlist.id, selectedSymbol)
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'rgba(0,229,212,0.1)',
+                          border: '1px solid rgba(0,229,212,0.2)',
+                          borderRadius: 4,
+                          color: '#00E5D4',
+                          fontSize: 10,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {!watchlist.is_default && (
                     <button
-                      key={symbol}
-                      onClick={() => handleAddSymbol(selectedWatchlist.id, symbol)}
-                      className="px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary hover:bg-secondary transition text-sm"
+                      onClick={() => toggleDefault(watchlist.id)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        background: 'rgba(0,229,212,0.05)',
+                        border: '1px solid rgba(0,229,212,0.2)',
+                        borderRadius: 6,
+                        color: '#8FA3B8',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
                     >
-                      + {symbol}
+                      Set Default
                     </button>
-                  ))}
+                  )}
+                  <button
+                    onClick={() => setEditingWatchlist(editingWatchlist === watchlist.id ? null : watchlist.id)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: editingWatchlist === watchlist.id ? 'rgba(0,229,212,0.15)' : 'rgba(0,229,212,0.05)',
+                      border: '1px solid rgba(0,229,212,0.2)',
+                      borderRadius: 6,
+                      color: '#8FA3B8',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {editingWatchlist === watchlist.id ? 'Done' : 'Add Symbol'}
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-2xl p-6 max-w-md w-full border border-accent border-opacity-20">
-            <h2 className="text-xl font-bold text-accent mb-4">Create Watchlist</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-text-secondary mb-1">Watchlist Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Top Gainers"
-                  className="w-full px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary placeholder-text-muted"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-text-secondary mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description"
-                  className="w-full px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary placeholder-text-muted resize-none"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-secondary hover:bg-secondary transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateWatchlist}
-                  className="flex-1 px-3 py-2 bg-accent text-background rounded font-semibold hover:bg-accent-hover transition disabled:opacity-50"
-                  disabled={!formData.name}
-                >
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
+            </AnimatedCard>
+          ))}
         </div>
       )}
     </div>

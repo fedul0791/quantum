@@ -1,234 +1,284 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { AlertType, AlertNotificationMethod } from '@/types/alerts'
+import { AnimatedCard } from '@/lib/animations'
+
+interface Alert {
+  id: number
+  symbol: string
+  alert_type: string
+  threshold: number
+  status: string
+  created_at: string
+}
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<any[]>([])
-  const [notifications, setNotifications] = useState<any[]>([])
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [formData, setFormData] = useState({
-    symbol: 'BTCUSDT',
-    alert_type: 'ofi_threshold',
-    condition: { threshold: 0.5, direction: 'above' },
-    notification_method: 'both',
-    name: '',
-    description: '',
-  })
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newAlert, setNewAlert] = useState({ symbol: 'BTCUSDT', type: 'OFI', value: '0.2' })
+  const [creating, setCreating] = useState(false)
 
+  // Fetch alerts on mount
   useEffect(() => {
     fetchAlerts()
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, 5000)
-    return () => clearInterval(interval)
   }, [])
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch('/api/alerts/list', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/alerts', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
-      if (response.ok) {
-        const data = await response.json()
-        setAlerts(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch alerts:', error)
+
+      if (!response.ok) throw new Error('Failed to load alerts')
+      const data = await response.json()
+      setAlerts(Array.isArray(data) ? data : [])
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load alerts'
+      setError(message)
+      console.error('Alerts fetch error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetch('/api/alerts/notifications/list', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setNotifications(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error)
-    }
-  }
+  const handleCreateAlert = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreating(true)
 
-  const handleCreateAlert = async () => {
     try {
-      const response = await fetch('/api/alerts/create', {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/alerts', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          symbol: newAlert.symbol,
+          alert_type: newAlert.type,
+          threshold: parseFloat(newAlert.value),
+        }),
       })
-      if (response.ok) {
-        setShowCreateModal(false)
-        fetchAlerts()
-        setFormData({
-          symbol: 'BTCUSDT',
-          alert_type: 'ofi_threshold',
-          condition: { threshold: 0.5, direction: 'above' },
-          notification_method: 'both',
-          name: '',
-          description: '',
-        })
-      }
-    } catch (error) {
-      console.error('Failed to create alert:', error)
+
+      if (!response.ok) throw new Error('Failed to create alert')
+      
+      await fetchAlerts()
+      setNewAlert({ symbol: 'BTCUSDT', type: 'OFI', value: '0.2' })
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create alert'
+      setError(message)
+      console.error('Alert creation error:', err)
+    } finally {
+      setCreating(false)
     }
   }
 
-  const handleDeleteAlert = async (alertId: string) => {
+  const deleteAlert = async (id: number) => {
     try {
-      const response = await fetch(`/api/alerts/${alertId}`, {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/alerts/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
-      if (response.ok) {
-        fetchAlerts()
-      }
-    } catch (error) {
-      console.error('Failed to delete alert:', error)
+
+      if (!response.ok) throw new Error('Failed to delete alert')
+      await fetchAlerts()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete alert'
+      setError(message)
+      console.error('Alert deletion error:', err)
     }
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-accent">Alert Management</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-accent text-background rounded font-semibold hover:bg-accent-hover transition"
-        >
-          + Create Alert
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* Alerts */}
-        <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-6">
-          <h2 className="text-lg font-semibold text-accent mb-4">Active Alerts ({alerts.length})</h2>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {alerts.map(alert => (
-              <div key={alert.id} className="p-3 bg-surface-hover rounded border border-accent border-opacity-20">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold text-text-primary">{alert.name}</div>
-                    <div className="text-xs text-text-secondary mt-1">
-                      {alert.symbol} • {alert.alert_type.replace('_', ' ').toUpperCase()}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteAlert(alert.id)}
-                    className="text-xs text-danger hover:text-danger transition"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
-            {alerts.length === 0 && (
-              <div className="text-center text-text-secondary text-sm py-8">No active alerts</div>
-            )}
-          </div>
+    <div style={{ padding: 24 }}>
+      {/* Header */}
+      <AnimatedCard delay={0}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#F5F7FA', marginBottom: 8 }}>
+            Alert Configuration
+          </h1>
+          <p style={{ color: '#8FA3B8', fontSize: 14 }}>Create and manage market alerts for real-time notifications</p>
         </div>
+      </AnimatedCard>
 
-        {/* Notifications */}
-        <div className="rounded-2xl bg-surface border border-accent border-opacity-10 p-6">
-          <h2 className="text-lg font-semibold text-accent mb-4">Recent Notifications ({notifications.length})</h2>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {notifications.map(notif => (
-              <div
-                key={notif.id}
-                className={`p-3 rounded border ${
-                  notif.is_read
-                    ? 'bg-surface-hover border-accent border-opacity-10'
-                    : 'bg-accent bg-opacity-10 border-accent border-opacity-30'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold text-text-primary">{notif.title}</div>
-                    <div className="text-xs text-text-secondary mt-1">{notif.message}</div>
-                    <div className="text-xs text-text-muted mt-1">
-                      {new Date(notif.triggered_at).toLocaleString()}
-                    </div>
-                  </div>
-                  {!notif.is_read && (
-                    <div className="w-2 h-2 bg-accent rounded-full mt-1" />
-                  )}
-                </div>
-              </div>
-            ))}
-            {notifications.length === 0 && (
-              <div className="text-center text-text-secondary text-sm py-8">No notifications yet</div>
-            )}
+      {/* Error Message */}
+      {error && (
+        <AnimatedCard delay={0.02}>
+          <div style={{
+            padding: 12,
+            background: 'rgba(255, 71, 87, 0.1)',
+            border: '1px solid rgba(255, 71, 87, 0.3)',
+            borderRadius: 12,
+            color: '#FF4757',
+            marginBottom: 20,
+            fontSize: 12,
+          }}>
+            ⚠️ {error}
           </div>
-        </div>
-      </div>
+        </AnimatedCard>
+      )}
 
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-2xl p-6 max-w-md w-full border border-accent border-opacity-20">
-            <h2 className="text-xl font-bold text-accent mb-4">Create Alert</h2>
-
-            <div className="space-y-4">
+      {/* Create Alert Form */}
+      <AnimatedCard delay={0.05}>
+        <div style={{ background: 'rgba(16,24,38,0.6)', border: '1px solid rgba(0,229,212,0.1)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>Create New Alert</h2>
+          
+          <form onSubmit={handleCreateAlert}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
               <div>
-                <label className="block text-sm text-text-secondary mb-1">Symbol</label>
+                <label style={{ display: 'block', color: '#8FA3B8', fontSize: 12, marginBottom: 6 }}>Symbol</label>
                 <select
-                  value={formData.symbol}
-                  onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary"
+                  value={newAlert.symbol}
+                  onChange={(e) => setNewAlert({ ...newAlert, symbol: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'rgba(7, 11, 18, 0.5)',
+                    border: '1px solid rgba(0,229,212,0.2)',
+                    borderRadius: 6,
+                    color: '#F5F7FA',
+                    fontSize: 12,
+                  }}
                 >
-                  <option>BTCUSDT</option>
-                  <option>ETHUSDT</option>
-                  <option>SOLUSDT</option>
+                  {['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm text-text-secondary mb-1">Alert Type</label>
+                <label style={{ display: 'block', color: '#8FA3B8', fontSize: 12, marginBottom: 6 }}>Alert Type</label>
                 <select
-                  value={formData.alert_type}
-                  onChange={(e) => setFormData({ ...formData, alert_type: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary"
+                  value={newAlert.type}
+                  onChange={(e) => setNewAlert({ ...newAlert, type: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'rgba(7, 11, 18, 0.5)',
+                    border: '1px solid rgba(0,229,212,0.2)',
+                    borderRadius: 6,
+                    color: '#F5F7FA',
+                    fontSize: 12,
+                  }}
                 >
-                  <option value="ofi_threshold">OFI Threshold</option>
-                  <option value="volatility_spike">Volatility Spike</option>
-                  <option value="spread_expansion">Spread Expansion</option>
-                  <option value="queue_imbalance">Queue Imbalance</option>
+                  <option>OFI</option>
+                  <option>Volatility</option>
+                  <option>Spread</option>
+                  <option>Queue Imbalance</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm text-text-secondary mb-1">Alert Name</label>
+                <label style={{ display: 'block', color: '#8FA3B8', fontSize: 12, marginBottom: 6 }}>Threshold</label>
                 <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., High OFI Alert"
-                  className="w-full px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-primary placeholder-text-muted"
+                  type="number"
+                  step="0.01"
+                  value={newAlert.value}
+                  onChange={(e) => setNewAlert({ ...newAlert, value: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'rgba(7, 11, 18, 0.5)',
+                    border: '1px solid rgba(0,229,212,0.2)',
+                    borderRadius: 6,
+                    color: '#F5F7FA',
+                    fontSize: 12,
+                  }}
                 />
               </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-3 py-2 bg-surface-hover rounded border border-accent border-opacity-20 text-text-secondary hover:bg-secondary transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateAlert}
-                  className="flex-1 px-3 py-2 bg-accent text-background rounded font-semibold hover:bg-accent-hover transition"
-                >
-                  Create
-                </button>
-              </div>
             </div>
-          </div>
+
+            <button
+              type="submit"
+              disabled={creating || loading}
+              style={{
+                padding: '10px 20px',
+                background: 'rgba(0,229,212,0.1)',
+                border: '1px solid rgba(0,229,212,0.3)',
+                borderRadius: 6,
+                color: '#00E5D4',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: creating || loading ? 'not-allowed' : 'pointer',
+                opacity: creating || loading ? 0.6 : 1,
+              }}
+            >
+              {creating ? 'Creating...' : '+ Create Alert'}
+            </button>
+          </form>
         </div>
-      )}
+      </AnimatedCard>
+
+      {/* Active Alerts */}
+      <AnimatedCard delay={0.1}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#00E5D4', marginBottom: 16 }}>Active Alerts</h2>
+          
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: '#8FA3B8' }}>
+              Loading alerts...
+            </div>
+          ) : alerts.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: '#8FA3B8' }}>
+              No alerts configured yet
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {alerts.map(alert => (
+                <div
+                  key={alert.id}
+                  style={{
+                    background: 'rgba(16,24,38,0.6)',
+                    border: '1px solid rgba(0,229,212,0.1)',
+                    borderRadius: 8,
+                    padding: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ color: '#F5F7FA', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      {alert.symbol} — {alert.alert_type}
+                    </div>
+                    <div style={{ color: '#8FA3B8', fontSize: 11 }}>
+                      Threshold: {alert.threshold}
+                    </div>
+                    <div style={{ color: '#5C728A', fontSize: 10, marginTop: 4 }}>
+                      {new Date(alert.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: alert.status === 'active' ? '#00E5A0' : '#FFA502',
+                    }} />
+                    <button
+                      onClick={() => deleteAlert(alert.id)}
+                      style={{
+                        padding: '4px 8px',
+                        background: 'rgba(255, 71, 87, 0.1)',
+                        border: '1px solid rgba(255, 71, 87, 0.2)',
+                        borderRadius: 4,
+                        color: '#FF4757',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AnimatedCard>
     </div>
   )
 }
