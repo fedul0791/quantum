@@ -9,3 +9,8 @@ out/
 .vercel/
 .cache/
 *.log
+__pycache__/
+*.pyc
+.venv/
+.next/
+node_modules/
