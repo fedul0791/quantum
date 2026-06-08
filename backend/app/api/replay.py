@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from ..core import get_db
@@ -15,8 +15,8 @@ router = APIRouter(prefix="/api/replay", tags=["replay"])
 @router.get("/historical-trades")
 async def get_historical_trades(
     symbol: str = Query("BTCUSDT"),
-    start_time: datetime = Query(datetime.utcnow() - timedelta(hours=1)),
-    end_time: datetime = Query(datetime.utcnow()),
+    start_time: datetime = Query(datetime.now(timezone.utc) - timedelta(hours=1)),
+    end_time: datetime = Query(datetime.now(timezone.utc)),
     limit: int = Query(1000, le=10000),
     session: AsyncSession = Depends(get_db),
     user = Depends(get_current_user),
@@ -46,8 +46,8 @@ async def get_historical_trades(
 @router.get("/historical-orderbook")
 async def get_historical_orderbook(
     symbol: str = Query("BTCUSDT"),
-    start_time: datetime = Query(datetime.utcnow() - timedelta(hours=1)),
-    end_time: datetime = Query(datetime.utcnow()),
+    start_time: datetime = Query(datetime.now(timezone.utc) - timedelta(hours=1)),
+    end_time: datetime = Query(datetime.now(timezone.utc)),
     limit: int = Query(500, le=5000),
     session: AsyncSession = Depends(get_db),
     user = Depends(get_current_user),

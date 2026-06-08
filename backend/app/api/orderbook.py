@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from ..core import get_db
@@ -37,7 +37,7 @@ async def get_current_orderbook(
             best_bid=0.0,
             best_ask=0.0,
             spread=0.0,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
     
     # Convert to OrderBookLevel objects and limit

@@ -1,7 +1,7 @@
-from sqlalchemy import Column, String, DateTime, Float, Integer, ForeignKey, Enum, JSON, Boolean, BigInteger
+from sqlalchemy import Column, String, DateTime, Float, Integer, ForeignKey, Enum, JSON, Boolean, BigInteger, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -25,9 +25,9 @@ class Trade(Base):
     is_buyer_maker = Column(Boolean, nullable=False)  # True = sell order initiated, False = buy order initiated
     
     # Timestamps
-    event_time = Column(DateTime, nullable=False, index=True)
-    trade_time = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    event_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    trade_time = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # Computed fields
     quote_asset_volume = Column(Float, nullable=True)  # price * quantity
@@ -49,8 +49,8 @@ class OrderBookSnapshot(Base):
     asks = Column(JSONB, nullable=False)  # [[price, qty], ...]
     
     # Metadata
-    event_time = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    event_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     
     # HFT metrics (cached)
     best_bid = Column(Float, nullable=True)
@@ -89,8 +89,8 @@ class MarketMetrics(Base):
     sell_volume = Column(Float, nullable=True)
     
     # Timestamp
-    recorded_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    recorded_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     def __repr__(self):
         return f"<MarketMetrics {self.symbol} {self.recorded_at}>"

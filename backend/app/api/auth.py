@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from ..core import (
@@ -104,7 +104,7 @@ async def login(
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
     
     # Save refresh token to DB
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     await AuthService.create_refresh_token(
         session, str(user.id), refresh_token, expires_at
     )

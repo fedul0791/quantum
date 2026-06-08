@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Boolean, Integer, Enum
+from sqlalchemy import Column, String, DateTime, Boolean, Integer, Enum, func
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -36,13 +36,13 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    last_login = Column(DateTime, nullable=True)
+    # Timestamps (use func.now() for database-side timestamps)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    last_login = Column(DateTime(timezone=True), nullable=True)
     
     # Premium info
-    premium_expires_at = Column(DateTime, nullable=True)
+    premium_expires_at = Column(DateTime(timezone=True), nullable=True)
     
     def __repr__(self):
         return f"<User {self.email}>"

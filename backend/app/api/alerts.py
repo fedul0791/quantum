@@ -168,7 +168,7 @@ async def mark_notification_as_read(
 ):
     """Mark notification as read"""
     
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     stmt = select(AlertNotification).where(
         AlertNotification.id == notification_id,
@@ -184,7 +184,7 @@ async def mark_notification_as_read(
         )
     
     notification.is_read = True
-    notification.read_at = datetime.utcnow()
+    notification.read_at = datetime.now(timezone.utc)
     
     await session.commit()
     

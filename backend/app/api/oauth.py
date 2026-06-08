@@ -3,7 +3,7 @@ Google OAuth authentication
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import httpx
 import logging
 
@@ -104,7 +104,7 @@ async def google_callback(
         refresh_token = create_refresh_token(data={"sub": str(user.id)})
         
         # Save refresh token
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         await AuthService.create_refresh_token(session, str(user.id), refresh_token, expires_at)
         
         logger.info(f"User logged in via Google: {user.email}")

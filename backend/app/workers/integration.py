@@ -6,7 +6,7 @@ to the FastAPI backend, storing data in PostgreSQL and broadcasting via WebSocke
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select
 from redis import asyncio as redis_asyncio
 
@@ -53,10 +53,10 @@ async def process_trades():
                         quantity=data.get("quantity"),
                         is_buyer_maker=data.get("buyer_maker", False),
                         event_time=datetime.fromisoformat(
-                            data.get("event_time", datetime.utcnow().isoformat())
+                            data.get("event_time", datetime.now(timezone.utc).isoformat())
                         ),
                         trade_time=datetime.fromisoformat(
-                            data.get("trade_time", datetime.utcnow().isoformat())
+                            data.get("trade_time", datetime.now(timezone.utc).isoformat())
                         ),
                         quote_asset_volume=data.get("price", 0) * data.get("quantity", 0),
                     )
@@ -106,7 +106,7 @@ async def process_depth():
                         bids=bids,
                         asks=asks,
                         event_time=datetime.fromisoformat(
-                            data.get("event_time", datetime.utcnow().isoformat())
+                            data.get("event_time", datetime.now(timezone.utc).isoformat())
                         ),
                         best_bid=best_bid,
                         best_ask=best_ask,

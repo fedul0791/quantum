@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from ..core import get_db
@@ -40,7 +40,7 @@ async def get_hft_metrics(
             realized_vol_30s=0.0,
             fill_probability=50.0,
             trade_imbalance=0.0,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
     
     return HFTMetricsResponse(

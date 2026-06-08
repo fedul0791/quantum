@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from ..core import get_db
@@ -36,7 +36,7 @@ async def get_market_overview(
             # Get 24h change (simplified - in production, fetch from external API)
             stmt_24h = select(Trade).where(
                 Trade.symbol == symbol,
-                Trade.event_time >= datetime.utcnow() - timedelta(hours=24)
+                Trade.event_time >= datetime.now(timezone.utc) - timedelta(hours=24)
             ).order_by(Trade.event_time).limit(1)
             
             result_24h = await session.execute(stmt_24h)
@@ -57,7 +57,7 @@ async def get_market_overview(
     
     return MarketOverviewResponse(
         symbols=prices,
-        last_update=datetime.utcnow(),
+        last_update=datetime.now(timezone.utc),
     )
 
 

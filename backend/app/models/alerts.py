@@ -1,7 +1,7 @@
-from sqlalchemy import Column, String, DateTime, Float, Integer, ForeignKey, Enum, Boolean, Text
+from sqlalchemy import Column, String, DateTime, Float, Integer, ForeignKey, Enum, Boolean, Text, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -48,8 +48,8 @@ class Alert(Base):
     name = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     def __repr__(self):
         return f"<Alert {self.symbol} {self.alert_type}>"
@@ -73,9 +73,9 @@ class AlertNotification(Base):
     is_sent = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
-    triggered_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    sent_at = Column(DateTime, nullable=True)
-    read_at = Column(DateTime, nullable=True)
+    triggered_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
     
     def __repr__(self):
         return f"<AlertNotification {self.title}>"
@@ -101,8 +101,8 @@ class Watchlist(Base):
     is_public = Column(Boolean, default=False)
     
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     def __repr__(self):
         return f"<Watchlist {self.name}>"

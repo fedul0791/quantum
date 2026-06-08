@@ -3,7 +3,7 @@ import json
 import logging
 import redis.asyncio as redis
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class RealTimeService:
                 "type": "market_update",
                 "symbol": symbol,
                 "data": data,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             
             await cls._redis_client.publish(
@@ -58,7 +58,7 @@ class RealTimeService:
                 "type": "hft_update",
                 "symbol": symbol,
                 "metrics": metrics,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             
             await cls._redis_client.publish(

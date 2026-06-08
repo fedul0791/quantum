@@ -2,7 +2,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class RateLimiter:
     
     def is_allowed(self, client_id: str) -> bool:
         """Check if client is allowed to make a request"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         minute_ago = now - timedelta(minutes=1)
         
         # Clean old requests
@@ -64,7 +64,7 @@ class RequestLogger:
                 "method": request.method,
                 "path": request.url.path,
                 "client": request.client.host if request.client else "unknown",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
     
@@ -77,7 +77,7 @@ class RequestLogger:
                 "path": request.url.path,
                 "status_code": status_code,
                 "duration_ms": duration_ms,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
     
@@ -89,7 +89,7 @@ class RequestLogger:
                 "method": request.method,
                 "path": request.url.path,
                 "error": str(error),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
             exc_info=True
         )

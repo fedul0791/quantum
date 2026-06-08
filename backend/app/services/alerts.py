@@ -2,7 +2,7 @@
 Alert checking service for triggering alerts
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,7 +46,7 @@ class AlertCheckService:
                         user_id=alert.user_id,
                         title=f"{alert.name} Triggered",
                         message=f"{alert.symbol} condition met: {alert.condition}",
-                        triggered_at=datetime.utcnow(),
+                        triggered_at=datetime.now(timezone.utc),
                         is_sent=False,
                     )
                     

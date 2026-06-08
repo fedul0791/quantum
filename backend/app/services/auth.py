@@ -155,7 +155,7 @@ class AuthService:
         if not refresh_token:
             return False
         
-        from datetime import datetime
-        refresh_token.revoked_at = datetime.utcnow()
+        from datetime import datetime, timezone
+        refresh_token.revoked_at = datetime.now(timezone.utc)
         await session.commit()
         return True
