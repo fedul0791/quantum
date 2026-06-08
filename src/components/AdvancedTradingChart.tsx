@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { createChart, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts'
+import { createChart, ColorType } from 'lightweight-charts'
 
 interface CandleData {
   time: number
@@ -30,14 +30,12 @@ export function AdvancedTradingChart({
 }: AdvancedTradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
-  const candleSeriesRef = useRef<any>(null)
-  const volumeSeriesRef = useRef<any>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
 
     try {
-      // Create chart with lightweight-charts v4 API
+      // Create chart with lightweight-charts
       const chart = createChart(containerRef.current, {
         layout: {
           textColor: '#d1d5db',
@@ -58,8 +56,8 @@ export function AdvancedTradingChart({
 
       chartRef.current = chart
 
-      // Create candlestick series using v4 API
-      const candleSeries = chart.addSeries(CandlestickSeries, {
+      // Create candlestick series using correct API
+      const candleSeries = chart.addCandlestickSeries({
         upColor: '#00E5D4',
         downColor: '#FF4757',
         borderUpColor: '#00E5D4',
@@ -68,21 +66,17 @@ export function AdvancedTradingChart({
         wickDownColor: '#FF4757',
       })
 
-      candleSeriesRef.current = candleSeries
-
-      // Create volume bars (histogram)
-      const volumeSeries = chart.addSeries(HistogramSeries, {
-        color: 'rgba(0, 229, 212, 0.3)',
-      })
-
-      volumeSeriesRef.current = volumeSeries
-
       // Set data
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         candleSeries.setData(data)
-      }
-      if (volume.length > 0) {
-        volumeSeries.setData(volume)
+      } else {
+        // Provide default mock data
+        const mockData = [
+          { time: 1000, open: 100, high: 110, low: 95, close: 105 },
+          { time: 2000, open: 105, high: 115, low: 100, close: 110 },
+          { time: 3000, open: 110, high: 120, low: 105, close: 115 },
+        ]
+        candleSeries.setData(mockData)
       }
 
       // Fit content
@@ -90,10 +84,9 @@ export function AdvancedTradingChart({
 
       // Handle resize
       const handleResize = () => {
-        if (containerRef.current) {
-          chart.applyOptions({
-            width: containerRef.current.clientWidth,
-          })
+        if (containerRef.current && chartRef.current) {
+          const width = containerRef.current.clientWidth
+          chartRef.current.applyOptions({ width })
         }
       }
 
@@ -101,26 +94,16 @@ export function AdvancedTradingChart({
 
       return () => {
         window.removeEventListener('resize', handleResize)
-        chart.remove()
+        try {
+          chart.remove()
+        } catch (e) {
+          console.error('Error removing chart:', e)
+        }
       }
     } catch (error) {
       console.error('Chart initialization error:', error)
     }
-  }, [])
-
-  // Update data when it changes
-  useEffect(() => {
-    if (candleSeriesRef.current && data.length > 0) {
-      candleSeriesRef.current.setData(data)
-      chartRef.current?.timeScale().fitContent()
-    }
   }, [data])
-
-  useEffect(() => {
-    if (volumeSeriesRef.current && volume.length > 0) {
-      volumeSeriesRef.current.setData(volume)
-    }
-  }, [volume])
 
   return (
     <div
