@@ -5,6 +5,7 @@ import { useMarketStore } from '@/store/marketStore'
 import ProfessionalOrderBook from '@/components/ProfessionalOrderBook'
 import HFTAnalytics from '@/components/HFTAnalytics'
 import { AnimatedCard, SlideIn } from '@/lib/animations'
+import { useWebSocket } from '@/lib/useWebSocket'
 
 function Sparkline({ data, color, width = 80, height = 30 }: { data: number[]; color: string; width?: number; height?: number }) {
   if (!data || data.length < 2) return <div style={{ width, height }} />
@@ -48,6 +49,12 @@ export default function Dashboard() {
   const isConnected = useMarketStore(state => state.isConnected)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // WebSocket connections
+  useWebSocket('BTCUSDT', 'market')
+  useWebSocket('ETHUSDT', 'market')
+  useWebSocket('SOLUSDT', 'market')
+  useWebSocket('BTCUSDT', 'hft')
 
   useEffect(() => {
     binanceWS.connect()

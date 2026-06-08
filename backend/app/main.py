@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from .middleware.middleware import rate_limit_middleware, logging_middlewarefrom fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -16,9 +16,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Quantum Flow Terminal API")
     await init_db()
+    await RealTimeService.init()
     yield
     # Shutdown
     logger.info("Shutting down Quantum Flow Terminal API")
+    await RealTimeService.close()
     await dispose_db()
 
 
@@ -28,7 +30,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+app.add_middleware(logging_middleware)
+app.add_middleware(rate_limit_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

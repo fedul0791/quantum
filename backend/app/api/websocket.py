@@ -3,10 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 import json
 import logging
+import asyncio
 from datetime import datetime
 
 from ..core import get_db, get_user_id_from_token
 from ..models import MarketMetrics, OrderBookSnapshot, Trade
+from .realtime import RealTimeService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ws", tags=["websocket"])
@@ -40,11 +42,45 @@ manager = ConnectionManager()
 
 
 @router.websocket("/market/{symbol}")
-async def websocket_market_data(websocket: WebSocket, symbol: str):
+async def websocket_market_data(websocket: WebSocket, symbol: str, db: AsyncSession = Depends(get_db)):
     """WebSocket for real-time market data streaming"""
     
     channel = f"market_{symbol}"
     await manager.connect(websocket, channel)
+    
+    # Subscribe to Redis market updates
+    async def market_callback(data):
+        try:
+            if data.get("type") == "trade":
+                # Broadcast trade data
+                await manager.broadcast(
+                    {
+                        "type": "trade_update",
+                        "symbol": symbol,
+                        "price": data.get("price"),
+                        "quantity": data.get("quantity"),
+                        "timestamp": data.get("event_time"),
+                    },
+                    channel
+                )
+            elif data.get("type") == "depth":
+                # Broadcast depth data
+                await manager.broadcast(
+                    {
+                        "type": "depth_update",
+                        "symbol": symbol,
+                        "bids": data.get("bids", [])[:10],
+                        "asks": data.get("asks", [])[:10],
+                        "timestamp": data.get("event_time"),
+                    },
+                    channel
+                )
+        except Exception as e:
+            logger.error(f"Error in market callback: {e}")
+    
+    subscribe_task = asyncio.create_task(
+        RealTimeService.subscribe_to_market_data(symbol, market_callback)
+    )
     
     try:
         while True:
@@ -57,9 +93,11 @@ async def websocket_market_data(websocket: WebSocket, symbol: str):
     
     except WebSocketDisconnect:
         manager.disconnect(websocket, channel)
+        subscribe_task.cancel()
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         manager.disconnect(websocket, channel)
+        subscribe_task.cancel()
 
 
 @router.websocket("/hft/{symbol}")

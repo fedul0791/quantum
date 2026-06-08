@@ -35,6 +35,27 @@ export default function LoginPage() {
     }
   }
 
+  const handleGoogleLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    const redirectUri = `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/google-callback`
+    const scope = 'openid profile email'
+    const responseType = 'code'
+    
+    if (!clientId) {
+      setError('Google OAuth is not configured')
+      return
+    }
+    
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    authUrl.searchParams.append('client_id', clientId)
+    authUrl.searchParams.append('redirect_uri', redirectUri)
+    authUrl.searchParams.append('response_type', responseType)
+    authUrl.searchParams.append('scope', scope)
+    authUrl.searchParams.append('state', Math.random().toString(36).substring(7))
+    
+    window.location.href = authUrl.toString()
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -63,6 +84,39 @@ export default function LoginPage() {
             <p style={{ color: '#8FA3B8', fontSize: 14 }}>
               Institutional Grade Market Intelligence
             </p>
+          </div>
+
+          {/* Google OAuth Button */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              background: 'rgba(55, 66, 250, 0.1)',
+              border: '1px solid rgba(55, 66, 250, 0.3)',
+              borderRadius: 8,
+              color: '#3742FA',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            <span>🔐</span>
+            Sign in with Google
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(0,229,212,0.1)' }} />
+            <span style={{ color: '#8FA3B8', fontSize: 12 }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(0,229,212,0.1)' }} />
           </div>
 
           {/* Form */}
@@ -170,7 +224,7 @@ export default function LoginPage() {
                 transition: 'all 0.2s',
               }}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In with Email'}
             </button>
           </form>
 
