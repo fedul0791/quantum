@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ..core import get_db, get_user_id_from_token
 from ..models import MarketMetrics, OrderBookSnapshot, Trade
-from .realtime import RealTimeService
+from ..services.realtime import RealTimeService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ws", tags=["websocket"])

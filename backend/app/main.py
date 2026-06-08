@@ -1,9 +1,11 @@
-from .middleware.middleware import rate_limit_middleware, logging_middlewarefrom fastapi import FastAPI
+from .middleware.middleware import rate_limit_middleware, logging_middleware
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
 from .core import init_db, dispose_db, get_settings
+from .services.realtime import RealTimeService
 from .api import auth, dashboard, hft, orderbook, websocket, alerts, watchlists, replay, oauth
 
 settings = get_settings()
