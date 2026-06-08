@@ -2,12 +2,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AnimatedCard } from '@/lib/animations'
+import { useAuth } from '@/lib/useAuth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const { setAccessToken, setUser } = useAuth()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,7 +28,9 @@ export default function LoginPage() {
       }
 
       const data = await response.json()
-      localStorage.setItem('token', data.access_token)
+      // Store access token in memory only (not localStorage)
+      setAccessToken(data.access_token)
+      setUser(data.user || { email })
       window.location.href = '/'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
@@ -46,12 +50,20 @@ export default function LoginPage() {
       return
     }
     
+    // Generate cryptographically secure state
+    const state = typeof window !== 'undefined' && window.crypto 
+      ? window.crypto.randomUUID() 
+      : Math.random().toString(36).substring(7)
+    
+    // Store state in sessionStorage for verification on callback
+    sessionStorage.setItem('oauth_state', state)
+    
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
     authUrl.searchParams.append('client_id', clientId)
     authUrl.searchParams.append('redirect_uri', redirectUri)
     authUrl.searchParams.append('response_type', responseType)
     authUrl.searchParams.append('scope', scope)
-    authUrl.searchParams.append('state', Math.random().toString(36).substring(7))
+    authUrl.searchParams.append('state', state)
     
     window.location.href = authUrl.toString()
   }
@@ -166,7 +178,7 @@ export default function LoginPage() {
                 fontWeight: 600,
                 marginBottom: 8,
               }}>
-                Password
+                Password (min 8 characters, must contain uppercase, lowercase, number, special char)
               </label>
               <input
                 type="password"
