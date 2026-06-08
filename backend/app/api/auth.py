@@ -19,6 +19,7 @@ from ..schemas import (
     TokenResponse,
     TokenRefresh,
 )
+from ..schemas.password import UserRegisterRequest, UserLoginRequest, PasswordValidator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -51,12 +52,18 @@ async def get_current_user(
 
 @router.post("/register", response_model=UserResponse)
 async def register(
-    user_data: UserCreate,
+    user_data: UserRegisterRequest,
     session: AsyncSession = Depends(get_db),
 ):
-    """Register new user"""
+    """Register new user with strong password validation"""
     try:
-        user = await AuthService.register_user(session, user_data)
+        # Password strength already validated by schema validator
+        # Convert to UserCreate for service
+        user_create = UserCreate(
+            email=user_data.email,
+            password=user_data.password,
+        )
+        user = await AuthService.register_user(session, user_create)
         return UserResponse.model_validate(user)
     except ValueError as e:
         raise HTTPException(
@@ -73,7 +80,7 @@ async def register(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    credentials: UserLogin,
+    credentials: UserLoginRequest,
     session: AsyncSession = Depends(get_db),
 ):
     """Login user"""
